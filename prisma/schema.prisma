@@ -1,0 +1,60 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// --------------------------------------------------------
+// 1. The "Source of Truth" (Current State of a Post)
+// --------------------------------------------------------
+model Post {
+  id        String   @id // The X Post ID
+  text      String?  // The content
+  author    String   // The handle (e.g., "YourMainAccount")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Current Metrics
+  views     Int      @default(0)
+  likes     Int      @default(0)
+  reposts   Int      @default(0) // Renamed from retweets
+  replies   Int      @default(0)
+
+  // Relation
+  snapshots Snapshot[]
+}
+
+// --------------------------------------------------------
+// 2. The "Time Machine" (Historical Data)
+// --------------------------------------------------------
+model Snapshot {
+  id        Int      @id @default(autoincrement())
+  timestamp DateTime @default(now())
+  
+  // Metrics at this specific moment
+  views     Int
+  likes     Int
+  reposts   Int      // Renamed from retweets
+  replies   Int
+
+  // Relation
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+}
+
+// --------------------------------------------------------
+// 3. System Logs
+// --------------------------------------------------------
+model SystemLog {
+  id        Int      @id @default(autoincrement())
+  level     String
+  message   String
+  metadata  Json?
+  timestamp DateTime @default(now())
+}
