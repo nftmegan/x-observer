@@ -1,6 +1,7 @@
 import { chromium, BrowserContext, Page } from 'playwright';
 import path from 'path';
 import fs from 'fs';
+import { logger } from '../utils/logger.js';
 
 interface BrowserConfig {
   accountId: string;
@@ -10,6 +11,7 @@ interface BrowserConfig {
     password?: string;
   };
   headless?: boolean;
+  disableLoginCheck?: boolean; // 👈 NEW OPTION
 }
 
 export class BrowserEngine {
@@ -28,28 +30,37 @@ export class BrowserEngine {
       fs.mkdirSync(this.userDataDir, { recursive: true });
     }
 
-    // ⚙️ CONFIG: Check .env for headless preference (Debug Mode)
-    // If HEADLESS_MODE is 'false', the browser will pop up visible.
-    const globalHeadless = process.env.HEADLESS_MODE === 'true';
-    const finalHeadless = this.config.headless ?? globalHeadless;
+    // 2. 🧠 SMART CHECK: Is the session folder empty?
+    let hasSessionData = false;
+    try {
+      const files = fs.readdirSync(this.userDataDir);
+      hasSessionData = files.length > 0;
+    } catch (e) { hasSessionData = false; }
 
-    // 🛡️ STRICT TYPE SAFETY FIX:
-    // We use the spread operator ...() to conditionally add keys.
-    // This ensures we NEVER pass 'undefined' to an optional property.
+    const globalHeadless = process.env.HEADLESS_MODE === 'true';
+    let finalHeadless = this.config.headless ?? globalHeadless;
+
+    // 🚨 AUTO-OVERRIDE LOGIC
+    // Only force visible IF we are missing session AND it's not a utility task
+    if (!hasSessionData && !this.config.disableLoginCheck) {
+      logger.warn(`⚠️ No session files found for ${this.config.accountId}!`);
+      logger.warn('👀 Forcing HEADLESS=false so you can log in manually.');
+      finalHeadless = false;
+    }
+
+    // Strict Proxy Config (Spread Syntax Fix)
     const launchOptions = {
       headless: finalHeadless,
-      viewport: null, 
+      viewport: null,
       args: [
         '--disable-blink-features=AutomationControlled',
         '--start-maximized',
         '--no-sandbox',
         '--disable-infobars'
       ],
-      // Only add 'proxy' key if the config exists
       ...(this.config.proxy ? {
         proxy: {
           server: this.config.proxy.server,
-          // Only add auth fields if they exist
           ...(this.config.proxy.username ? { username: this.config.proxy.username } : {}),
           ...(this.config.proxy.password ? { password: this.config.proxy.password } : {})
         }
@@ -60,7 +71,6 @@ export class BrowserEngine {
 
     this.page = this.context.pages()[0] || await this.context.newPage();
 
-    // Stealth: Remove 'navigator.webdriver' property
     await this.page.addInitScript(() => {
       Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
     });

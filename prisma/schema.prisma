@@ -21,7 +21,7 @@ model Post {
   // Current Metrics
   views     Int      @default(0)
   likes     Int      @default(0)
-  reposts   Int      @default(0) // Renamed from retweets
+  reposts   Int      @default(0)
   replies   Int      @default(0)
 
   // Relation
@@ -38,7 +38,7 @@ model Snapshot {
   // Metrics at this specific moment
   views     Int
   likes     Int
-  reposts   Int      // Renamed from retweets
+  reposts   Int
   replies   Int
 
   // Relation
