@@ -28,26 +28,39 @@ export class BrowserEngine {
       fs.mkdirSync(this.userDataDir, { recursive: true });
     }
 
-    const proxySettings = this.config.proxy ? {
-      server: this.config.proxy.server,
-      username: this.config.proxy.username,
-      password: this.config.proxy.password
-    } : undefined;
+    // ⚙️ CONFIG: Check .env for headless preference (Debug Mode)
+    // If HEADLESS_MODE is 'false', the browser will pop up visible.
+    const globalHeadless = process.env.HEADLESS_MODE === 'true';
+    const finalHeadless = this.config.headless ?? globalHeadless;
 
-    this.context = await chromium.launchPersistentContext(this.userDataDir, {
-      headless: this.config.headless ?? false,
-      viewport: null,
+    // 🛡️ STRICT TYPE SAFETY FIX:
+    // We use the spread operator ...() to conditionally add keys.
+    // This ensures we NEVER pass 'undefined' to an optional property.
+    const launchOptions = {
+      headless: finalHeadless,
+      viewport: null, 
       args: [
         '--disable-blink-features=AutomationControlled',
         '--start-maximized',
         '--no-sandbox',
         '--disable-infobars'
       ],
-      proxy: proxySettings
-    });
+      // Only add 'proxy' key if the config exists
+      ...(this.config.proxy ? {
+        proxy: {
+          server: this.config.proxy.server,
+          // Only add auth fields if they exist
+          ...(this.config.proxy.username ? { username: this.config.proxy.username } : {}),
+          ...(this.config.proxy.password ? { password: this.config.proxy.password } : {})
+        }
+      } : {})
+    };
+
+    this.context = await chromium.launchPersistentContext(this.userDataDir, launchOptions);
 
     this.page = this.context.pages()[0] || await this.context.newPage();
 
+    // Stealth: Remove 'navigator.webdriver' property
     await this.page.addInitScript(() => {
       Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
     });

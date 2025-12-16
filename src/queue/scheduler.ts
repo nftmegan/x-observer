@@ -1,6 +1,6 @@
 import { Queue } from 'bullmq';
-import { redisConnection } from '../config/redis';
-import { logger } from '../utils/logger';
+import { redisConnection } from '../config/redis.js';
+import { logger } from '../utils/logger.js';
 
 export const scraperQueue = new Queue('scraper-queue', { 
   connection: redisConnection,

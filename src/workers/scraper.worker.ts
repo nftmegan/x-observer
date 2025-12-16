@@ -1,13 +1,16 @@
 import { Worker, Job } from 'bullmq';
-import { redisConnection } from '../config/redis';
-import { Scraper } from '../core/scraper';
-import { logger } from '../utils/logger';
+import { redisConnection } from '../config/redis.js';
+import { Scraper } from '../core/scraper.js';
+import { logger } from '../utils/logger.js';
 
 interface ScrapeJobData {
   targetAccount: string;
   burnerAccount: string;
   proxy?: any;
 }
+
+// ⚙️ CONFIG: Load concurrency from .env or default to 1
+const CONCURRENCY_LIMIT = parseInt(process.env.CONCURRENCY || '1', 10);
 
 export const scraperWorker = new Worker<ScrapeJobData>(
   'scraper-queue',
@@ -29,7 +32,9 @@ export const scraperWorker = new Worker<ScrapeJobData>(
   },
   {
     connection: redisConnection,
-    concurrency: 1,
+    concurrency: CONCURRENCY_LIMIT, // 👈 Scaling happens here
     limiter: { max: 1, duration: 1000 }
   }
 );
+
+logger.info(`👷 Worker initialized with ${CONCURRENCY_LIMIT} concurrent threads.`);
